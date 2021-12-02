@@ -68,6 +68,10 @@ class XMLParser:
         self.__tree.write(self.__filepath, xml_declaration=True)
         return self.__tree
 
+    def save_links_to_csv_file(self, links):
+        with open("invalid_links.csv", "w") as file:
+            file.writelines(links)
+
 
 class Spider:
     """The bot responsible for crawling through the site and 
@@ -85,6 +89,9 @@ class Spider:
     """
     def __init__(self, homepage, filepath, header=None):
         self.homepage = homepage
+        self.invalid_links = set()
+        self.downloadable_links = set()
+
         self.xml_parser = XMLParser(self.homepage, filepath)
 
         if header is not None:
@@ -105,10 +112,15 @@ class Spider:
         -------
         A BeautifulSoup object if url is valid else it returns None
         """
+
         req = requests.get(url, headers=self.headers)
         if req.status_code == 200:
             return BeautifulSoup(req.content, 'html5lib')
-        print(req.status_code)
+        else:
+            # invalid link are detected here but they can also be left
+            # and propagated to>>>> (hint: go to the crawl function)
+            self.invalid_links.add(url)
+            print(req.status_code)
 
     def extract_links(self, page):
         """Extracts all the links from the page that are either 
@@ -150,19 +162,25 @@ class Spider:
 
             # comment this code block to reveal more errors
             # in the download links (will dramatically reduce speed)
+
             ext = os.path.splitext(url)[-1]
             doc_files = {".pdf", ".xlsx", ".csv", ".docx", ".doc"}
             if ext in doc_files:
                 params['changefreq'] = "never"
                 params['priority'] = "0.8"
 
+                # downloadable links are also detected here
+                self.downloadable_links.add(url)
+
+                # send the link to xml_parser instance
                 self.xml_parser.add_url(params)
-                self.__counter += 1
                 continue
 
             links = self.get_links(url)
 
             # if there is any error in accessing the link
+
+            # >>>>> to here (detecting invalid links)
             if not links:
                 params['changefreq'] = "never"
                 params['priority'] = "0.0"
@@ -171,7 +189,9 @@ class Spider:
                 continue
 
             # access additional link present on this page
-            # if there is no error accesing its page
+            # if there was no error in accesing the link page
+
+            
             for link_tag in links:
                 link = link_tag.attrs['href']
                 
@@ -187,8 +207,17 @@ class Spider:
             self.__no_of_links += 1
         print(f"Finished building sitemap of {self.__no_of_links} links")
 
+    def show_website_statistics(self):
+        print(f"Total number of website scanned:\t {self.__no_of_links + len(self.invalid_links) + len(self.downloadable_links)}")
+        print(f"Number of Invalid links:\t {len(self.invalid_links)}")
+        print(f"Number of downloadable links:\t {len(self.downloadable_links)}")
+
     def close(self):
         print("Saving sitemap")
+        self.xml_parser.save_links_to_csv_file(self.invalid_links)
+        self.xml_parser.save_links_to_csv_file(self.downloadable_links)
+
+        self.show_website_statistics()
         return self.xml_parser.close()
 
 
