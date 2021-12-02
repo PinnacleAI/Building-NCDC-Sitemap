@@ -149,7 +149,7 @@ class Spider:
             # eg. [.pdf, .csv, .xlsx, .docx, .doc]
 
             # comment this code block to reveal more errors
-            # in the download links
+            # in the download links (will dramatically reduce speed)
             ext = os.path.splitext(url)[-1]
             doc_files = {".pdf", ".xlsx", ".csv", ".docx", ".doc"}
             if ext in doc_files:
